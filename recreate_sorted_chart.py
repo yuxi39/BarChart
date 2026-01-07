@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import sys, os, logging
 import numpy as np
+import argparse
+import json
+import textwrap
+from typing import List, Tuple, Dict
 
 print('DEBUG: script started, cwd=', os.getcwd())
 sys.stdout.flush()
@@ -17,8 +21,8 @@ OUTPUT_DIR = Path.cwd() / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 print(f"Using OUTPUT_DIR: {OUTPUT_DIR}")
 
-# Data extracted from the provided image (values in 万元)
-data = {
+# Default data (used if no config is provided)
+default_data = {
     "李艳华": 8638.0,
     "郑群": 2418.3,
     "胡军可": 2397.3,
@@ -27,10 +31,12 @@ data = {
     "钟征华": 35.1,
 }
 
-# Sort descending by value
-items = sorted(data.items(), key=lambda x: x[1], reverse=False)
-names = [n for n, v in items]
-values = [v for n, v in items]
+# We'll determine data and headers via CLI/config below; for now set placeholders
+# Data loading and sorting happens after parsing arguments and optional config file
+
+# Dynamic layout and axes will be created later after we know the data size
+# (created after sorting so sizing can adapt to number of rows)
+
 
 # Use Agg backend for headless environments and configure fonts
 mpl.use('Agg')
@@ -41,6 +47,109 @@ mpl.rcParams["axes.unicode_minus"] = False
 OUTPUT_DIR = Path('d:/moqt-project/outputs')
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 print(f"Using OUTPUT_DIR: {OUTPUT_DIR}")
+
+# ------------------------
+# CLI / Config parsing
+# ------------------------
+parser = argparse.ArgumentParser(description='Generate a sorted horizontal bar chart from JSON/config.')
+parser.add_argument('--config', type=str, help='Path to JSON config file that contains title, tag, unit, left_summary, data')
+parser.add_argument('--data-file', type=str, help='Path to a JSON file containing just the data list [[name, value], ...]')
+parser.add_argument('--title', type=str, help='Chart title (overrides config)')
+parser.add_argument('--tag', type=str, help='Right header tag (e.g., 回款金额)')
+parser.add_argument('--unit', type=str, help='Unit string (e.g., 万元)')
+parser.add_argument('--left-summary', dest='left_summary', type=str, default='总回款金额', help='Left summary label')
+parser.add_argument('--output-dir', type=str, help='Output directory (overrides default)')
+parser.add_argument('--overwrite-pptx', action='store_true', help='Allow overwriting existing PPTX')
+args = parser.parse_args()
+
+# allow override of output dir
+if args.output_dir:
+    OUTPUT_DIR = Path(args.output_dir)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+config = {}
+# load config if provided
+if args.config:
+    try:
+        with open(args.config, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except Exception as e:
+        print(f"Could not read config file {args.config}: {e}")
+        config = {}
+
+# load minimal data file if provided
+if args.data_file:
+    try:
+        with open(args.data_file, 'r', encoding='utf-8') as f:
+            dfile = json.load(f)
+            # expect list of [name,value]
+            if isinstance(dfile, dict):
+                config.setdefault('data', list(dfile.items()))
+            else:
+                config.setdefault('data', dfile)
+    except Exception as e:
+        print(f"Could not read data file {args.data_file}: {e}")
+
+# merge CLI simple overrides
+if args.title:
+    config['title'] = args.title
+if args.tag:
+    config['tag'] = args.tag
+if args.unit:
+    config['unit'] = args.unit
+if args.left_summary:
+    config['left_summary'] = args.left_summary
+
+# Finalize data: prefer config['data'] -> default_data
+if 'data' in config and config['data']:
+    # support either dict or list of pairs
+    if isinstance(config['data'], dict):
+        data = {str(k): float(v) for k, v in config['data'].items()}
+    else:
+        # expect list like [[name, value], ...]
+        try:
+            data = {str(k): float(v) for k, v in config['data']}
+        except Exception:
+            # fallback: try to coerce
+            data = {str(item[0]): float(item[1]) for item in config['data']}
+else:
+    data = default_data.copy()
+
+# headers and labels
+title = config.get('title', '各业务员回款金额对比分析')
+tag = config.get('tag', '回款金额')
+unit = config.get('unit', '万元')
+left_summary = config.get('left_summary', '总回款金额')
+
+print(f"Using chart title: {title}; tag: {tag}; unit: {unit}; left_summary: {left_summary}")
+
+# ------------------------
+# End CLI/config parsing
+# ------------------------
+
+# Sort descending by value and create dynamic layout based on row count
+items = sorted(data.items(), key=lambda x: x[1], reverse=False)
+names = [n for n, v in items]
+values = [v for n, v in items]
+
+# Dynamic layout sizing based on number of rows
+n_rows = len(names)
+base_height = 5.5
+row_height = 0.5  # inches per row
+fig_height = max(base_height, 1.2 + n_rows * row_height)
+fig = plt.figure(figsize=(16, fig_height))  # width, height in inches
+fig.patch.set_facecolor('white')
+
+# adaptive bar height and font sizes
+bar_height = min(0.6, max(0.25, 0.6 * (8.0 / max(8, n_rows))))
+label_fontsize = 16 if n_rows <= 8 else max(10, int(16 - (n_rows - 8) // 2))
+value_fontsize = 14 if n_rows <= 8 else max(9, int(14 - (n_rows - 8) // 2))
+title_fontsize = 26 if n_rows <= 8 else max(16, int(26 - (n_rows - 8) // 2))
+header_fontsize = max(11, int(title_fontsize * 0.45))
+
+# axes: keep the same relative margins but the figure height now scales
+ax = fig.add_axes([0.07, 0.06, 0.88, 0.76])  # left, bottom, width, height (lowered and slightly shorter)
+
 
 # Colors matching the manual chart palette
 colors = ["#89c0ff", "#ffb3e6", "#ffd88a", "#c7e9d7", "#78cfe0", "#7fe6d0"]
@@ -54,11 +163,7 @@ def strip_trailing_zero(v: float) -> str:
 
 # Start fresh figure and avoid leftover axes (which can show 0-1 normalized axes)
 plt.close('all')
-fig = plt.figure(figsize=(16, 5.5))  # width, height in inches
-fig.patch.set_facecolor('white')
-# use a wider plotting area to match the green-frame layout in outputs/chart_given_large.svg
-
-# we'll create and use our own axes below (so there's no stray 0-1 axes)
+# Figure and axes will be created dynamically after data sorting so sizing can adapt to number of rows
 
 # Grid/style will be applied on the created axes
 
@@ -68,7 +173,7 @@ fig.patch.set_facecolor('white')
 
 # New axes for chart area — expanded to match the larger blue-frame layout
 # Make the plotting area a bit lower so the top bar has space from the header background
-ax = fig.add_axes([0.07, 0.06, 0.88, 0.76])  # left, bottom, width, height (lowered and slightly shorter)
+# Axes created dynamically below based on number of data rows
 
 # Vertical grid lines (linear axis)
 max_val = max(values)
@@ -110,11 +215,11 @@ for i, (name, v) in enumerate(items):
     # label column: placed on the left, right-aligned so labels hug the left edge
     # shift the name labels slightly right without moving the bars
     label_text_x = label_col_x + max_val*0.03
-    ax.text(label_text_x, y, name, ha='right', va='center', fontsize=16, fontfamily='Microsoft YaHei', clip_on=False)
+    ax.text(label_text_x, y, name, ha='right', va='center', fontsize=label_fontsize, fontfamily='Microsoft YaHei', clip_on=False)
     # value label: place outside on the right, bold, no unit (show original value)
     val_str = strip_trailing_zero(v)
     val_x = bar_start + bar_w + max_val*0.02
-    ax.text(val_x, y, val_str, ha='left', va='center', fontsize=14, color='#222', fontweight='bold', clip_on=False)
+    ax.text(val_x, y, val_str, ha='left', va='center', fontsize=value_fontsize, color='#222', fontweight='bold', clip_on=False)
 
 # now that bar_start_base is known, shift tick/grid positions so the axis starts at the bar start
 tick_positions_shifted = [bar_start_base + t for t in x_ticks_orig]
@@ -163,12 +268,12 @@ total = sum(values)
 header_y = 0.94
 # dark header background
 fig.patches.extend([patches.Rectangle((0, header_y - 0.06), 1, 0.12, transform=fig.transFigure, facecolor='#1f3b4d', zorder=0)])
-# left: total box (rounded) — use the same dark header style as the right header and increase visibility
-fig.text(0.03, header_y, f"总回款金额：{total:.1f}万元", fontsize=13, color='white', bbox=dict(boxstyle="round,pad=0.35", facecolor='#1f3b4d', edgecolor='#1f3b4d'), ha='left', va='center')
+# left: total box (rounded) — use left_summary and unit
+fig.text(0.03, header_y, f"{left_summary}：{total:.1f}{unit}", fontsize=header_fontsize, color='white', bbox=dict(boxstyle="round,pad=0.35", facecolor='#1f3b4d', edgecolor='#1f3b4d'), ha='left', va='center')
 # center: title
-fig.text(0.5, header_y, '各业务员回款金额对比分析', ha='center', va='center', fontsize=26, color='white', fontweight='bold')
-# right: small right-aligned label, visually consistent with left total box
-fig.text(0.965, header_y, '回款金额（万元）', ha='right', va='center', fontsize=14, color='white', bbox=dict(boxstyle='round,pad=0.22', facecolor='#1f3b4d', edgecolor='#1f3b4d'))
+fig.text(0.5, header_y, title, ha='center', va='center', fontsize=title_fontsize, color='white', fontweight='bold')
+# right: tag and unit
+fig.text(0.965, header_y, f"{tag}（{unit}）", ha='right', va='center', fontsize=header_fontsize, color='white', bbox=dict(boxstyle='round,pad=0.22', facecolor='#1f3b4d', edgecolor='#1f3b4d'))
 
 # remove top/right/left spines but keep bottom for numeric ticks
 for spine in ['top','right','left']:
