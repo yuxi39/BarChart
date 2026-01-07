@@ -13,6 +13,159 @@ import textwrap
 from typing import List, Tuple, Dict
 
 print('DEBUG: script started, cwd=', os.getcwd())
+
+
+def generate_chart(config: Dict, output_dir: Path = Path('d:/moqt-project/outputs'), overwrite_pptx: bool = False) -> Dict[str, str]:
+    """Generate chart assets from a configuration dict.
+
+    Args:
+        config: dict containing keys 'title', 'tag', 'unit', 'left_summary', 'data' (list or dict)
+        output_dir: Path where generated files are written
+        overwrite_pptx: whether to overwrite an existing PPTX
+
+    Returns:
+        dict with paths: {'png': str, 'svg': str, 'pptx': str}
+    """
+    # Copy defaults and parse config
+    cfg = dict(config or {})
+    # data normalization
+    if 'data' in cfg and cfg['data']:
+        if isinstance(cfg['data'], dict):
+            data_local = {str(k): float(v) for k, v in cfg['data'].items()}
+        else:
+            data_local = {str(k): float(v) for k, v in cfg['data']}
+    else:
+        data_local = default_data.copy()
+
+    title_local = cfg.get('title', title)
+    tag_local = cfg.get('tag', tag)
+    unit_local = cfg.get('unit', unit)
+    left_summary_local = cfg.get('left_summary', left_summary)
+
+    # Sort and prepare
+    items_local = sorted(data_local.items(), key=lambda x: x[1], reverse=False)
+    names_local = [n for n, v in items_local]
+    values_local = [v for n, v in items_local]
+
+    # create outputs directory
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # The drawing logic mirrors the original script but uses local variables
+    plt.close('all')
+    n_rows = len(names_local)
+    base_height = 5.5
+    row_height = 0.5
+    fig_height = max(base_height, 1.2 + n_rows * row_height)
+    fig = plt.figure(figsize=(16, fig_height))
+    fig.patch.set_facecolor('white')
+
+    # dynamic sizes
+    bar_height_local = min(0.6, max(0.25, 0.6 * (8.0 / max(8, n_rows))))
+    label_fontsize_local = 16 if n_rows <= 8 else max(10, int(16 - (n_rows - 8) // 2))
+    value_fontsize_local = 14 if n_rows <= 8 else max(9, int(14 - (n_rows - 8) // 2))
+    title_fontsize_local = 26 if n_rows <= 8 else max(16, int(26 - (n_rows - 8) // 2))
+    header_fontsize_local = max(11, int(title_fontsize_local * 0.45))
+
+    ax = fig.add_axes([0.07, 0.06, 0.88, 0.76])
+
+    # compute ticks and layout
+    max_val_local = max(values_local) if values_local else 0
+    mag = 10 ** int(np.floor(np.log10(max_val_local))) if max_val_local > 0 else 1
+    tick_base = int((max_val_local // mag) * mag)
+    if tick_base == 0:
+        tick_base = int(mag)
+    x_ticks_orig_local = [int(round(t)) for t in np.linspace(0, tick_base, 5)]
+    x_ticks_orig_local = sorted(list(dict.fromkeys(x_ticks_orig_local)))
+
+    # draw bars
+    import matplotlib.patches as patches
+    ys = list(range(len(names_local)))
+    label_col_x_local = -max_val_local * 0.15
+    bar_start_base_local = label_col_x_local + max_val_local * 0.06
+
+    for i, (name, v) in enumerate(items_local):
+        y = ys[i]
+        bar_w = v
+        color = colors[i % len(colors)]
+        rect = patches.FancyBboxPatch((bar_start_base_local, y - bar_height_local / 2), bar_w, bar_height_local,
+                                      boxstyle="round,pad=0.02,rounding_size=6",
+                                      linewidth=0, facecolor=color, edgecolor=color)
+        ax.add_patch(rect)
+        label_text_x_local = label_col_x_local + max_val_local * 0.03
+        ax.text(label_text_x_local, y, name, ha='right', va='center', fontsize=label_fontsize_local, fontfamily='Microsoft YaHei', clip_on=False)
+        val_str = strip_trailing_zero(v)
+        val_x = bar_start_base_local + bar_w + max_val_local * 0.02
+        ax.text(val_x, y, val_str, ha='left', va='center', fontsize=value_fontsize_local, color='#222', fontweight='bold', clip_on=False)
+
+    # grid lines
+    tick_positions_shifted_local = [bar_start_base_local + t for t in x_ticks_orig_local]
+    for xtp in tick_positions_shifted_local:
+        ax.axvline(xtp, color='#e6e6e6', linestyle='--', linewidth=1)
+
+    # axis limits
+    start_data_local = label_col_x_local - max_val_local * 0.02
+    right_fig_x = 0.965
+    try:
+        disp = fig.transFigure.transform((right_fig_x - 0.02, 0.94))
+        mapped_end = ax.transData.inverted().transform(disp)[0]
+        desired_end = max(mapped_end, bar_start_base_local + max_val_local * 1.03)
+        end_data_local = desired_end
+    except Exception:
+        end_data_local = bar_start_base_local + max_val_local * 1.12
+
+    ax.set_xlim(start_data_local, max(end_data_local, max_val_local) + max_val_local * 0.03)
+    ax.set_ylim(-0.5, len(names_local) - 0.8)
+    ax.set_yticks([])
+    ax.set_xticks(tick_positions_shifted_local)
+    ax.set_xticklabels([f"{int(t):,}" for t in x_ticks_orig_local], fontsize=14, color='#555')
+    ax.tick_params(axis='x', which='major', labelsize=14, colors='#555')
+
+    bottom_axis_y_local = ax.get_ylim()[0] - 0.06
+    ax.hlines(bottom_axis_y_local, start_data_local, end_data_local, colors='#666', linewidth=2, zorder=3)
+    ax.spines['bottom'].set_visible(False)
+
+    # header
+    total_local = sum(values_local)
+    header_y = 0.94
+    fig.patches.extend([patches.Rectangle((0, header_y - 0.06), 1, 0.12, transform=fig.transFigure, facecolor='#1f3b4d', zorder=0)])
+    fig.text(0.03, header_y, f"{left_summary_local}：{total_local:.1f}{unit_local}", fontsize=header_fontsize_local, color='white', bbox=dict(boxstyle="round,pad=0.35", facecolor='#1f3b4d', edgecolor='#1f3b4d'), ha='left', va='center')
+    fig.text(0.5, header_y, title_local, ha='center', va='center', fontsize=title_fontsize_local, color='white', fontweight='bold')
+    fig.text(0.965, header_y, f"{tag_local}（{unit_local}）", ha='right', va='center', fontsize=header_fontsize_local, color='white', bbox=dict(boxstyle='round,pad=0.22', facecolor='#1f3b4d', edgecolor='#1f3b4d'))
+
+    plt.subplots_adjust(left=0.11, right=0.99, top=0.94, bottom=0.04)
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
+
+    png_path = output_dir / "chart_sorted.png"
+    svg_path = output_dir / "chart_sorted.svg"
+    pptx_path = output_dir / "charts_presentation.pptx"
+
+    plt.savefig(png_path, dpi=300)
+    plt.savefig(svg_path, format='svg')
+    plt.close(fig)
+
+    # Create PPTX using the PNG
+    try:
+        from pptx import Presentation
+        from pptx.util import Inches
+        prs = Presentation()
+        blank = prs.slide_layouts[6]
+        slide = prs.slides.add_slide(blank)
+        slide.shapes.add_picture(str(png_path), Inches(0.5), Inches(0.8), width=Inches(9))
+        if overwrite_pptx:
+            prs.save(pptx_path)
+        else:
+            try:
+                prs.save(pptx_path)
+            except PermissionError:
+                alt_path = output_dir / "charts_presentation_v2.pptx"
+                prs.save(alt_path)
+                pptx_path = alt_path
+    except Exception as e:
+        print(f"Could not create PPTX: {e}")
+
+    return { 'png': str(png_path), 'svg': str(svg_path), 'pptx': str(pptx_path) }
+
 sys.stdout.flush()
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('debug logging enabled')
