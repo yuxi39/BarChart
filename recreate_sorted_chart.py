@@ -68,6 +68,10 @@ def generate_chart(config: Dict, output_dir: Path = Path('d:/moqt-project/output
     header_fontsize_local = max(11, int(title_fontsize_local * 0.45))
 
     ax = fig.add_axes([0.07, 0.06, 0.88, 0.76])
+    # hide axis spines to avoid thin black lines in exported bitmaps
+    for s in ['left', 'right', 'top', 'bottom']:
+        ax.spines[s].set_visible(False)
+    ax.set_frame_on(False)
 
     # compute ticks and layout
     max_val_local = max(values_local) if values_local else 0
@@ -90,7 +94,9 @@ def generate_chart(config: Dict, output_dir: Path = Path('d:/moqt-project/output
         color = colors[i % len(colors)]
         rect = patches.FancyBboxPatch((bar_start_base_local, y - bar_height_local / 2), bar_w, bar_height_local,
                                       boxstyle="round,pad=0.02,rounding_size=6",
-                                      linewidth=0, facecolor=color, edgecolor=color)
+                                      linewidth=0, facecolor=color, edgecolor='none', antialiased=False)
+        rect.set_edgecolor('none')
+        rect.set_antialiased(False)
         ax.add_patch(rect)
         label_text_x_local = label_col_x_local + max_val_local * 0.03
         ax.text(label_text_x_local, y, name, ha='right', va='center', fontsize=label_fontsize_local, fontfamily='Microsoft YaHei', clip_on=False)
@@ -302,6 +308,10 @@ header_fontsize = max(11, int(title_fontsize * 0.45))
 
 # axes: keep the same relative margins but the figure height now scales
 ax = fig.add_axes([0.07, 0.06, 0.88, 0.76])  # left, bottom, width, height (lowered and slightly shorter)
+# hide axis spines to avoid thin black lines in exported bitmaps
+for s in ['left', 'right', 'top', 'bottom']:
+    ax.spines[s].set_visible(False)
+ax.set_frame_on(False)  # remove axis frame
 
 
 # Colors matching the manual chart palette
@@ -361,7 +371,9 @@ for i, (name, v) in enumerate(items):
     # rectangle with rounded corners
     rect = patches.FancyBboxPatch((bar_start, y - bar_height/2), bar_w, bar_height,
                                   boxstyle="round,pad=0.02,rounding_size=6",
-                                  linewidth=0, facecolor=color, edgecolor=color)
+                                  linewidth=0, facecolor=color, edgecolor='none', antialiased=False)
+    rect.set_edgecolor('none')
+    rect.set_antialiased(False)
     ax.add_patch(rect)
     # label column: placed on the left, right-aligned so labels hug the left edge
     # shift the name labels slightly right without moving the bars
