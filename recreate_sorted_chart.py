@@ -17,14 +17,13 @@ OUTPUT_DIR = Path.cwd() / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 print(f"Using OUTPUT_DIR: {OUTPUT_DIR}")
 
-# Data extracted from the provided image (values in 万元)
+# 示例数据
 data = {
-    "李艳华": 8638.0,
-    "郑群": 2418.3,
-    "胡军可": 2397.3,
-    "谷大鹏": 1163.2,
-    "梁晨+靳宗齐": 504.8,
-    "钟征华": 35.1,
+    "项目A": 1234.5,
+    "项目B": 987.3,
+    "项目C": 756.2,
+    "项目D": 543.1,
+    "项目E": 321.0,
 }
 
 # Sort descending by value
@@ -38,7 +37,7 @@ mpl.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "Arial"]
 mpl.rcParams["axes.unicode_minus"] = False
 
 # Ensure outputs directory is explicit absolute path to repo root
-OUTPUT_DIR = Path('d:/moqt-project/outputs')
+OUTPUT_DIR = Path('./outputs')
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 print(f"Using OUTPUT_DIR: {OUTPUT_DIR}")
 
@@ -164,11 +163,11 @@ header_y = 0.94
 # dark header background
 fig.patches.extend([patches.Rectangle((0, header_y - 0.06), 1, 0.12, transform=fig.transFigure, facecolor='#1f3b4d', zorder=0)])
 # left: total box (rounded) — use the same dark header style as the right header and increase visibility
-fig.text(0.03, header_y, f"总回款金额：{total:.1f}万元", fontsize=13, color='white', bbox=dict(boxstyle="round,pad=0.35", facecolor='#1f3b4d', edgecolor='#1f3b4d'), ha='left', va='center')
+fig.text(0.03, header_y, f"总计：{total:.1f}单位", fontsize=13, color='white', bbox=dict(boxstyle="round,pad=0.35", facecolor='#1f3b4d', edgecolor='#1f3b4d'), ha='left', va='center')
 # center: title
-fig.text(0.5, header_y, '各业务员回款金额对比分析', ha='center', va='center', fontsize=26, color='white', fontweight='bold')
+fig.text(0.5, header_y, '示例数据对比分析', ha='center', va='center', fontsize=26, color='white', fontweight='bold')
 # right: small right-aligned label, visually consistent with left total box
-fig.text(0.965, header_y, '回款金额（万元）', ha='right', va='center', fontsize=14, color='white', bbox=dict(boxstyle='round,pad=0.22', facecolor='#1f3b4d', edgecolor='#1f3b4d'))
+fig.text(0.965, header_y, '数据值（单位）', ha='right', va='center', fontsize=14, color='white', bbox=dict(boxstyle='round,pad=0.22', facecolor='#1f3b4d', edgecolor='#1f3b4d'))
 
 # remove top/right/left spines but keep bottom for numeric ticks
 for spine in ['top','right','left']:
