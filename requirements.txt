@@ -1,0 +1,14 @@
+# 图表生成核心库
+matplotlib>=3.5.0
+numpy>=1.21.0
+
+# PPTX 生成
+python-pptx>=0.6.21
+
+# REST API 服务
+fastapi>=0.68.0
+uvicorn[standard]>=0.15.0
+pydantic>=1.8.0
+
+# 图像处理（可选，用于 SVG 转 PNG）
+Pillow>=8.0.0

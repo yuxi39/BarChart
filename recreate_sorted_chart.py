@@ -26,8 +26,19 @@ def generate_chart(config: Dict, output_dir: Path = Path('d:/moqt-project/output
     Returns:
         dict with paths: {'png': str, 'svg': str, 'pptx': str}
     """
+    # Helper function
+    def strip_trailing_zero(v: float) -> str:
+        s = f"{v:.1f}"
+        if s.endswith('.0'):
+            return s[:-2]
+        return s
+
     # Copy defaults and parse config
     cfg = dict(config or {})
+    
+    # Colors matching the manual chart palette
+    colors = ["#89c0ff", "#ffb3e6", "#ffd88a", "#c7e9d7", "#78cfe0", "#7fe6d0"]
+    
     # data normalization
     if 'data' in cfg and cfg['data']:
         if isinstance(cfg['data'], dict):
@@ -182,12 +193,11 @@ print(f"Using OUTPUT_DIR: {OUTPUT_DIR}")
 
 # Default data (used if no config is provided)
 default_data = {
-    "李艳华": 8638.0,
-    "郑群": 2418.3,
-    "胡军可": 2397.3,
-    "谷大鹏": 1163.2,
-    "梁晨+靳宗齐": 504.8,
-    "钟征华": 35.1,
+    "项目A": 1234.5,
+    "项目B": 987.3,
+    "项目C": 756.2,
+    "项目D": 543.1,
+    "项目E": 321.0,
 }
 
 # We'll determine data and headers via CLI/config below; for now set placeholders
@@ -202,10 +212,6 @@ mpl.use('Agg')
 mpl.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "Arial"]
 mpl.rcParams["axes.unicode_minus"] = False
 
-# Ensure outputs directory is explicit absolute path to repo root
-OUTPUT_DIR = Path('d:/moqt-project/outputs')
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-print(f"Using OUTPUT_DIR: {OUTPUT_DIR}")
 
 # ------------------------
 # CLI / Config parsing
@@ -216,7 +222,7 @@ parser.add_argument('--data-file', type=str, help='Path to a JSON file containin
 parser.add_argument('--title', type=str, help='Chart title (overrides config)')
 parser.add_argument('--tag', type=str, help='Right header tag (e.g., 回款金额)')
 parser.add_argument('--unit', type=str, help='Unit string (e.g., 万元)')
-parser.add_argument('--left-summary', dest='left_summary', type=str, default='总回款金额', help='Left summary label')
+parser.add_argument('--left-summary', dest='left_summary', type=str, default=None, help='Left summary label')
 parser.add_argument('--output-dir', type=str, help='Output directory (overrides default)')
 parser.add_argument('--overwrite-pptx', action='store_true', help='Allow overwriting existing PPTX')
 args = parser.parse_args()
@@ -275,10 +281,10 @@ else:
     data = default_data.copy()
 
 # headers and labels
-title = config.get('title', '各业务员回款金额对比分析')
-tag = config.get('tag', '回款金额')
-unit = config.get('unit', '万元')
-left_summary = config.get('left_summary', '总回款金额')
+title = config.get('title', '示例数据对比分析')
+tag = config.get('tag', '数据值')
+unit = config.get('unit', '单位')
+left_summary = config.get('left_summary', '总计')
 
 print(f"Using chart title: {title}; tag: {tag}; unit: {unit}; left_summary: {left_summary}")
 

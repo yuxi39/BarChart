@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-python-multipart
-pydantic
-requests
-python-pptx
-Pillow
-matplotlib
-numpy
