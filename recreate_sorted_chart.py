@@ -161,9 +161,7 @@ def strip_trailing_zero(v: float) -> str:
         return s[:-2]
     return s
 
-# Start fresh figure and avoid leftover axes (which can show 0-1 normalized axes)
-plt.close('all')
-# Figure and axes will be created dynamically after data sorting so sizing can adapt to number of rows
+# Note: figure/axes were created dynamically above based on data; do not close them here
 
 # Grid/style will be applied on the created axes
 
